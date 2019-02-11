@@ -84,7 +84,7 @@ public class NetworkDomainTearDown
 
             deleteFirewallRules(networkDomainId, api);
 
-            deleteServers(api, datacenterId);
+            deleteServers(api, datacenterId, networkDomainId);
 
             ImmutableList<Server> servers = api.getServerApi().listServers().concat().toList();
             if (!servers.isEmpty())
@@ -152,7 +152,7 @@ public class NetworkDomainTearDown
                 }
                 logger.info("Deleting Vlan with Id %s", vlan.id());
                 api.getNetworkApi().deleteVlan(vlan.id());
-               api.getNetworkApi().vlanDeletedPredicate().apply(vlan.id());
+                api.getNetworkApi().vlanDeletedPredicate().apply(vlan.id());
             }
             catch (Exception e)
             {
@@ -161,43 +161,45 @@ public class NetworkDomainTearDown
         }
     }
 
-    private static void deleteServers(DimensionDataCloudControlApi api, String datacenterId)
+    private static void deleteServers(DimensionDataCloudControlApi api, String datacenterId, String networkDomainId)
     {
         for (Server server : api.getServerApi().listServers(DatacenterIdListFilters.Builder.datacenterId(datacenterId)))
         {
-            try
+            if (server.networkInfo().networkDomainId().equals(networkDomainId))
             {
-                if (server.state() == State.FAILED_ADD)
+                try
                 {
-                    logger.info("Server with Id %s is in a FAILED_ADD state, running the clean server operation.", server.id());
-                    api.getServerApi().cleanServer(server.id());
-                   api.getServerApi().serverDeletedPredicate().apply(server.id());
-                    if (api.getServerApi().getServer(server.id()) != null)
+                    if (server.state() == State.FAILED_ADD)
                     {
-                        logger.info("Failed to clean Server with Id %s", server.id());
+                        logger.info("Server with Id %s is in a FAILED_ADD state, running the clean server operation.", server.id());
+                        api.getServerApi().cleanServer(server.id());
+                        api.getServerApi().serverDeletedPredicate().apply(server.id());
+                        if (api.getServerApi().getServer(server.id()) != null)
+                        {
+                            logger.info("Failed to clean Server with Id %s", server.id());
+                            continue;
+                        }
+                    }
+                    if (server.state() != State.NORMAL)
+                    {
+                        logger.info("Server with Id %s is not in a NORMAL state, current state %s - cannot delete", server.id(), server.state());
                         continue;
                     }
+                    if (server.started())
+                    {
+                        logger.info("Shutting down Server with Id %s", server.id());
+                        api.getServerApi().shutdownServer(server.id());
+                        api.getServerApi().serverStoppedPredicate().apply(server.id());
+                    }
+                    logger.info("Deleting Server with Id %s", server.id());
+                    api.getServerApi().deleteServer(server.id());
+                    api.getServerApi().serverDeletedPredicate().apply(server.id());
                 }
-                if (server.state() != State.NORMAL)
+                catch (Exception e)
                 {
-                    logger.info("Server with Id %s is not in a NORMAL state, current state %s - cannot delete", server.id(), server.state());
-                    continue;
+                    logger.error("Unable to Delete Server with Id %s due to: %s", server.id(), e.getMessage());
                 }
-                if (server.started())
-                {
-                    logger.info("Shutting down Server with Id %s", server.id());
-                    api.getServerApi().shutdownServer(server.id());
-                   api.getServerApi().serverStoppedPredicate().apply(server.id());
-                }
-                logger.info("Deleting Server with Id %s", server.id());
-                api.getServerApi().deleteServer(server.id());
-               api.getServerApi().serverDeletedPredicate().apply(server.id());
-            }
-            catch (Exception e)
-            {
-                logger.error("Unable to Delete Server with Id %s due to: %s", server.id(), e.getMessage());
             }
         }
     }
-
 }
