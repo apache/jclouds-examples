@@ -133,7 +133,7 @@ public class DeleteServerVlanAndNetworkDomain
              * A Vlan delete is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
              * has built in predicates that will block execution and check that the Vlan is not found.
              */
-           api.getNetworkApi().vlanDeletedPredicate().apply(vlan.id());
+           api.vlanDeletedPredicate().apply(vlan.id());
         }
     }
 
@@ -148,7 +148,7 @@ public class DeleteServerVlanAndNetworkDomain
          * A Network Domain delete is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
          * has built in predicates that will block execution and check that the Network Domain is not found.
          */
-       api.getNetworkApi().networkDomainDeletedPredicate().apply(networkDomainId);
+       api.networkDomainDeletedPredicate().apply(networkDomainId);
     }
 
     private static void deleteServer(DimensionDataCloudControlApi api, final String serverName)
@@ -179,7 +179,7 @@ public class DeleteServerVlanAndNetworkDomain
                  * A Shutdown Server operation is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
                  * has built in predicates that will block execution and check that the Server is shutdown.
                  */
-               api.getServerApi().serverStoppedPredicate().apply(server.id());
+               api.serverStoppedPredicate().apply(server.id());
             }
 
             /*
@@ -191,7 +191,7 @@ public class DeleteServerVlanAndNetworkDomain
              * A Server delete is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
              * has built in predicates that will block execution and check that the Server is not found.
              */
-           api.getServerApi().serverDeletedPredicate().apply(server.id());
+           api.serverDeletedPredicate().apply(server.id());
 
         }
     }

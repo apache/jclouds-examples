@@ -114,8 +114,8 @@ public class DeployNetworkDomainVlanAndServer
          * A Server deployment is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
          * has built in predicates that will block execution and check that the Server's State has moved from PENDING_ADD to NORMAL.
          */
-       api.getServerApi().serverStartedPredicate().apply(serverId);
-       api.getServerApi().serverNormalPredicate().apply(serverId);
+       api.serverStartedPredicate().apply(serverId);
+       api.serverNormalPredicate().apply(serverId);
 
         /*
          * Apply a Tag to the Server. We use AssetType SERVER.
@@ -145,7 +145,7 @@ public class DeployNetworkDomainVlanAndServer
          * has built in predicates that will block execution and check that the Network Domain's State has moved from PENDING_ADD to NORMAL.
          * We pass the Network Domain Identifier we wish to check the state of.
          */
-       api.getNetworkApi().networkDomainNormalPredicate().apply(networkDomainId);
+       api.networkDomainNormalPredicate().apply(networkDomainId);
 
         /*
          * Apply a Tag to the Network Domain. We use AssetType NETWORK_DOMAIN.
@@ -168,7 +168,7 @@ public class DeployNetworkDomainVlanAndServer
          * A Vlan deployment is an asynchronous process. We need to wait for it to complete. The Dimension Data provider
          * has built in predicates that will block execution and check that the Vlan's State has moved from PENDING_ADD to NORMAL.
          */
-       api.getNetworkApi().vlanNormalPredicate().apply(vlanId);
+       api.vlanNormalPredicate().apply(vlanId);
 
         /*
          * Apply a Tag to the Vlan. We use AssetType VLAN.

@@ -16,6 +16,8 @@
  */
 package org.jclouds.examples.dimensiondata.cloudcontrol;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.jclouds.ContextBuilder;
@@ -52,8 +54,9 @@ public class NetworkDomainTearDown
         String endpoint = args[0];
         String username = args[1];
         String password = args[2];
-        String networkDomainId = args[3];
+        String networkDomainIdArg = args[3];
 
+        boolean deleteAllNetworkDomains = networkDomainIdArg.equalsIgnoreCase("ALL");
         try (ApiContext<DimensionDataCloudControlApi> ctx = ContextBuilder.newBuilder(provider)
                 .endpoint(endpoint)
                 .credentials(username, password)
@@ -63,42 +66,65 @@ public class NetworkDomainTearDown
 
             DimensionDataCloudControlApi api = ctx.getApi();
 
-            logger.info("Deleting resources for network domain %s", networkDomainId);
-            NetworkDomain networkDomain = api.getNetworkApi().getNetworkDomain(networkDomainId);
-            if (networkDomain == null)
-            {
-                logger.info("Network Domain with Id %s is not found", networkDomainId);
-                return;
+            if(deleteAllNetworkDomains){
+                  ImmutableList<NetworkDomain> networkDomains = api.getNetworkApi().listNetworkDomains().concat().toList();
+
+                  for (NetworkDomain nd : networkDomains)
+                  {
+                      deleteAssetsAndNetworkDomain(api, nd);
+                  }
             }
-            if (networkDomain.state() != State.NORMAL)
-            {
-                logger.info("Network Domain with Id %s is not in a NORMAL state, cannot delete", networkDomain.id());
-                return;
+            else {
+                  NetworkDomain networkDomain = api.getNetworkApi().getNetworkDomain(networkDomainIdArg);
+                  if (networkDomain == null)
+                  {
+                      logger.info("Network Domain with Id %s is not found", networkDomainIdArg);
+                  }
+                  else {
+                      deleteAssetsAndNetworkDomain(api, networkDomain);
+                  }
             }
+        }
 
-            String datacenterId = networkDomain.datacenterId();
+    }
 
-            removePublicIpBlocks(networkDomainId, api);
+    private static void deleteAssetsAndNetworkDomain(DimensionDataCloudControlApi api, NetworkDomain networkDomain) {
+        final String networkDomainId = networkDomain.id();
+        logger.info("Deleting resources for network domain %s", networkDomainId);
 
-            deleteNatRules(networkDomainId, api);
+        if (networkDomain.state() != State.NORMAL)
+        {
+            logger.info("Network Domain with Id %s is not in a NORMAL state, cannot delete", networkDomain.id());
+        }
 
-            deleteFirewallRules(networkDomainId, api);
+        String datacenterId = networkDomain.datacenterId();
 
-            deleteServers(api, datacenterId, networkDomainId);
+        removePublicIpBlocks(networkDomainId, api);
 
-            ImmutableList<Server> servers = api.getServerApi().listServers().concat().toList();
-            if (!servers.isEmpty())
+        deleteNatRules(networkDomainId, api);
+
+        deleteFirewallRules(networkDomainId, api);
+
+        deleteServers(api, datacenterId, networkDomainId);
+
+        FluentIterable<Server> serversForNetworkDomain = api.getServerApi().listServers().concat().filter(new Predicate<Server>()
+        {
+            @Override
+            public boolean apply(Server input)
             {
-                logger.info("Could not delete all Servers. Servers not deleted:");
-                for (Server server : servers)
-                {
-                    logger.info("Id %s, Name %s, State, %s", server.id(), server.name(), server.state());
-                }
-                return;
+                return input.networkInfo().networkDomainId().equals(networkDomainId);
             }
+        });
+
+        if (serversForNetworkDomain.isEmpty())
+        {
             deleteVlans(api, networkDomain);
 
             deleteNetworkDomain(networkDomainId, api);
+        }
+        else
+        {
+            logger.info("Servers existing - %s - for Network Domain, cannot delete", serversForNetworkDomain.toList());
         }
     }
 
@@ -136,7 +162,7 @@ public class NetworkDomainTearDown
     {
         logger.info("Deleting Network Domain with Id %s", networkDomainId);
         api.getNetworkApi().deleteNetworkDomain(networkDomainId);
-        api.getNetworkApi().networkDomainDeletedPredicate().apply(networkDomainId);
+        api.networkDomainDeletedPredicate().apply(networkDomainId);
     }
 
     private static void deleteVlans(DimensionDataCloudControlApi api, NetworkDomain networkDomain)
@@ -152,7 +178,7 @@ public class NetworkDomainTearDown
                 }
                 logger.info("Deleting Vlan with Id %s", vlan.id());
                 api.getNetworkApi().deleteVlan(vlan.id());
-                api.getNetworkApi().vlanDeletedPredicate().apply(vlan.id());
+                api.vlanDeletedPredicate().apply(vlan.id());
             }
             catch (Exception e)
             {
@@ -173,7 +199,7 @@ public class NetworkDomainTearDown
                     {
                         logger.info("Server with Id %s is in a FAILED_ADD state, running the clean server operation.", server.id());
                         api.getServerApi().cleanServer(server.id());
-                        api.getServerApi().serverDeletedPredicate().apply(server.id());
+                        api.serverDeletedPredicate().apply(server.id());
                         if (api.getServerApi().getServer(server.id()) != null)
                         {
                             logger.info("Failed to clean Server with Id %s", server.id());
@@ -189,11 +215,11 @@ public class NetworkDomainTearDown
                     {
                         logger.info("Shutting down Server with Id %s", server.id());
                         api.getServerApi().shutdownServer(server.id());
-                        api.getServerApi().serverStoppedPredicate().apply(server.id());
+                        api.serverStoppedPredicate().apply(server.id());
                     }
                     logger.info("Deleting Server with Id %s", server.id());
                     api.getServerApi().deleteServer(server.id());
-                    api.getServerApi().serverDeletedPredicate().apply(server.id());
+                    api.serverDeletedPredicate().apply(server.id());
                 }
                 catch (Exception e)
                 {
