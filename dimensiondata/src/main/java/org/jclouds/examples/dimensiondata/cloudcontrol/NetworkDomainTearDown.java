@@ -95,6 +95,7 @@ public class NetworkDomainTearDown
         if (networkDomain.state() != State.NORMAL)
         {
             logger.info("Network Domain with Id %s is not in a NORMAL state, cannot delete", networkDomain.id());
+            return;
         }
 
         String datacenterId = networkDomain.datacenterId();
